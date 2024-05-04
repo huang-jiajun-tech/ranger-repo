@@ -2,9 +2,12 @@
 
 # 设置环境变量
 export OPENLDAP_HOST=$(/usr/share/google/get_metadata_value attributes/openldap-host)
-export OPENLDAP_BASE_DN=$(/usr/share/google/get_metadata_value attributes/openldap-base-dn)
-export SSSD_BIND_DN=$(/usr/share/google/get_metadata_value attributes/sssd-bind-dn)
+# export OPENLDAP_BASE_DN=$(/usr/share/google/get_metadata_value attributes/openldap-base-dn)
+# export SSSD_BIND_DN=$(/usr/share/google/get_metadata_value attributes/sssd-bind-dn)
 export SSSD_BIND_PASSWORD=$(/usr/share/google/get_metadata_value attributes/sssd-bind-password)
+
+export OPENLDAP_BASE_DN=dc=test,dc=com
+export SSSD_BIND_DN=cn=root,dc=test,dc=com
 
 function installSssdPackagesForOpenldap() {
 	retry_command "apt-get update"
