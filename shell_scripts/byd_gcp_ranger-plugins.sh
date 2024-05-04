@@ -48,9 +48,9 @@ export RANGER_HOST=$(/usr/share/google/get_metadata_value attributes/ranger-host
 # -------------------------------------   Open Source HDFS PlugIn Operations   --------------------------------------- #
 
 function installRangerOpenSourceHdfsPlugin() {
-    printHeading "INSTALL RANGER HDFS PLUGIN"
-    wget https://raw.githubusercontent.com/huang-jiajun-tech/ranger-repo/main/ranger-2.2.0-hdfs-plugin.tar.gz
-    tar -zxvf ranger-2.2.0-hdfs-plugin.tar.gz -C /opt &>/dev/null
+    #printHeading "INSTALL RANGER HDFS PLUGIN"
+    wget -P /opt https://raw.githubusercontent.com/huang-jiajun-tech/ranger-repo/main/ranger-2.2.0-hdfs-plugin.tar.gz
+    tar -zxvf /opt/ranger-2.2.0-hdfs-plugin.tar.gz -C /opt &>/dev/null
     installFilesDir=/opt/ranger-2.2.0-hdfs-plugin
     confFile=$installFilesDir/install.properties
     # backup install.properties
@@ -61,7 +61,7 @@ function installRangerOpenSourceHdfsPlugin() {
 
     installHome=/opt/ranger-2.2.0-hdfs-plugin
 
-    printHeading "INSTALL RANGER HDFS PLUGIN ON MASTER NODE"
+    #printHeading "INSTALL RANGER HDFS PLUGIN ON MASTER NODE"
     cp -r $installHome/lib/* /usr/lib/hadoop/lib
     cp -r $installHome/lib/* /usr/lib/hadoop-hdfs/lib
     cp -r $installHome/lib/ranger-hdfs-plugin-impl/usr/lib/hadoop/lib
@@ -72,7 +72,7 @@ function installRangerOpenSourceHdfsPlugin() {
 }
 
 function restartNamenode() {
-    printHeading "RESTART NAMENODE"
+    #printHeading "RESTART NAMENODE"
     systemctl stop hadoop-hdfs-namenode
     systemctl start hadoop-hdfs-namenode
 }
@@ -80,9 +80,9 @@ function restartNamenode() {
 # -------------------------------------   Open Source Hive PlugIn Operations   --------------------------------------- #
 
 function installRangerOpenSourceHivePlugin() {
-    printHeading "INSTALL RANGER HIVE PLUGIN"
-    wget https://raw.githubusercontent.com/huang-jiajun-tech/ranger-repo/main/ranger-2.2.0-hive-plugin.tar.gz    
-    tar -zxvf ranger-2.2.0-hive-plugin.tar.gz  -C /opt/ &>/dev/null
+    #printHeading "INSTALL RANGER HIVE PLUGIN"
+    wget -P /opt https://raw.githubusercontent.com/huang-jiajun-tech/ranger-repo/main/ranger-2.2.0-hive-plugin.tar.gz    
+    tar -zxvf /opt/ranger-2.2.0-hive-plugin.tar.gz -C /opt/ &>/dev/null
     installFilesDir=/opt/ranger-2.2.0-hive-plugin
     confFile=$installFilesDir/install.properties
     # backup install.properties
@@ -92,7 +92,7 @@ function installRangerOpenSourceHivePlugin() {
     sed -i "s|@RANGER_HOST@|${RANGER_HOST}|g" $confFile
     installHome=/opt/ranger-2.2.0-hive-plugin
 
-    printHeading "INSTALL RANGER HIVE PLUGIN ON MASTER NODE"
+    #printHeading "INSTALL RANGER HIVE PLUGIN ON MASTER NODE"
     cp -r $installHome/lib/* /usr/lib/hadoop/lib
     cp -r $installHome/lib/* /usr/lib/hadoop-hdfs/lib
     cp -r $installHome/lib/ranger-hive-plugin-impl/usr/lib/hadoop/lib
@@ -103,9 +103,9 @@ function installRangerOpenSourceHivePlugin() {
 }
 
 function restartHiveServer2() {
-    printHeading "RESTART HIVESERVER2"
-    sudo systemctl stop hive-server2
-    sudo systemctl start hive-server2
+    #printHeading "RESTART HIVESERVER2"
+    systemctl stop hive-server2
+    systemctl start hive-server2
 }
 
 ##retry command
