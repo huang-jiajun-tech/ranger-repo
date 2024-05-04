@@ -40,9 +40,9 @@
 #         exit 1
 #     fi
 # }
-export $CLUSTER_ID=$(/usr/share/google/get_metadata_value attributes/cluster-id)
-export $SOLR_HOST=$(/usr/share/google/get_metadata_value attributes/solr-host)
-export $RANGER_HOST=$(/usr/share/google/get_metadata_value attributes/ranger-host)
+export CLUSTER_ID=$(/usr/share/google/get_metadata_value attributes/cluster-id)
+export SOLR_HOST=$(/usr/share/google/get_metadata_value attributes/solr-host)
+export RANGER_HOST=$(/usr/share/google/get_metadata_value attributes/ranger-host)
 
 
 # -------------------------------------   Open Source HDFS PlugIn Operations   --------------------------------------- #
