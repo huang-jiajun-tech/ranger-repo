@@ -28,13 +28,13 @@ ldap_schema = rfc2307bis
 id_provider = ldap
 auth_provider = ldap
 chpass_provider = ldap
-ldap_uri = ldap://$OPENLDAP_HOST
+ldap_uri = ldap://${OPENLDAP_HOST}
 cache_credentials = True
 ldap_tls_reqcert = never
-ldap_search_base = $OPENLDAP_BASE_DN
-ldap_default_bind_dn = $SSSD_BIND_DN
+ldap_search_base = ${OPENLDAP_BASE_DN}
+ldap_default_bind_dn = ${SSSD_BIND_DN}
 ldap_default_authtok_type = password
-ldap_default_authtok = $SSSD_BIND_PASSWORD
+ldap_default_authtok = ${SSSD_BIND_PASSWORD}
 override_home=/home/%u
 default_shell=/bin/bash
 [nss]

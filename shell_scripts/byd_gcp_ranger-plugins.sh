@@ -40,6 +40,10 @@
 #         exit 1
 #     fi
 # }
+export $CLUSTER_ID=$(/usr/share/google/get_metadata_value attributes/cluster-id)
+export $SOLR_HOST=$(/usr/share/google/get_metadata_value attributes/solr-host)
+export $RANGER_HOST=$(/usr/share/google/get_metadata_value attributes/ranger-host)
+
 
 # -------------------------------------   Open Source HDFS PlugIn Operations   --------------------------------------- #
 
@@ -51,9 +55,9 @@ function installRangerOpenSourceHdfsPlugin() {
     confFile=$installFilesDir/install.properties
     # backup install.properties
     cp $confFile $confFile.$(date +%s)
-    sed -i "s|@CLUSTER_ID@|$CLUSTER_ID|g" $confFile
-    sed -i "s|@SOLR_HOST@|$SOLR_HOST|g" $confFile
-    sed -i "s|@POLICY_MGR_URL@|$RANGER_URL|g" $confFile
+    sed -i "s|@CLUSTER_ID@|${CLUSTER_ID}|g" $confFile
+    sed -i "s|@SOLR_HOST@|${SOLR_HOST}|g" $confFile
+    sed -i "s|@RANGER_HOST@|${RANGER_HOST}|g" $confFile
 
     installHome=/opt/ranger-2.2.0-hdfs-plugin
 
@@ -83,9 +87,9 @@ function installRangerOpenSourceHivePlugin() {
     confFile=$installFilesDir/install.properties
     # backup install.properties
     cp $confFile $confFile.$(date +%s)
-    sed -i "s|@CLUSTER_ID@|$EMR_CLUSTER_ID|g" $confFile
-    sed -i "s|@SOLR_HOST@|$SOLR_HOST|g" $confFile
-    sed -i "s|@RANGER_HOST@|$RANGER_HOST|g" $confFile
+    sed -i "s|@CLUSTER_ID@|${CLUSTER_ID}|g" $confFile
+    sed -i "s|@SOLR_HOST@|${SOLR_HOST}|g" $confFile
+    sed -i "s|@RANGER_HOST@|${RANGER_HOST}|g" $confFile
     installHome=/opt/ranger-2.2.0-hive-plugin
 
     printHeading "INSTALL RANGER HIVE PLUGIN ON MASTER NODE"
