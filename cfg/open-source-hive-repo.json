@@ -1,0 +1,13 @@
+{
+  "name": "HIVE_@CLUSTER_ID@",
+  "description": "Hive Repo",
+  "repositoryType": "Hive",
+  "isActive": true,
+  "config": "{
+   \"username\": \"hive\",
+   \"password\": \"hive\",
+   \"jdbc.driverClassName\": \"org.apache.hive.jdbc.HiveDriver\",
+   \"jdbc.url\": \"jdbc:hive2://@FIRST_MASTER_NODE@:10000/default\",
+   \"commonNameForCertificate\": \"\"
+ }"
+}
