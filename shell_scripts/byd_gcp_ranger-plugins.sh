@@ -62,10 +62,10 @@ function installRangerOpenSourceHdfsPlugin() {
     installHome=/opt/ranger-2.2.0-hdfs-plugin
 
     #printHeading "INSTALL RANGER HDFS PLUGIN ON MASTER NODE"
-    cp -r $installHome/lib/* /usr/lib/hadoop/lib
-    cp -r $installHome/lib/* /usr/lib/hadoop-hdfs/lib
-    cp -r $installHome/lib/ranger-hdfs-plugin-impl/usr/lib/hadoop/lib
-    cp -r $installHome/lib/ranger-hdfs-plugin-impl/usr/lib/hadoop-hdfs/lib
+    cp $installHome/lib/* /usr/lib/hadoop/lib
+    cp $installHome/lib/* /usr/lib/hadoop-hdfs/lib
+    cp -r $installHome/lib/ranger-hdfs-plugin-impl /usr/lib/hadoop/lib
+    cp -r $installHome/lib/ranger-hdfs-plugin-impl /usr/lib/hadoop-hdfs/lib
 
     bash $installHome/enable-hdfs-plugin.sh
     restartNamenode
@@ -93,10 +93,8 @@ function installRangerOpenSourceHivePlugin() {
     installHome=/opt/ranger-2.2.0-hive-plugin
 
     #printHeading "INSTALL RANGER HIVE PLUGIN ON MASTER NODE"
-    cp -r $installHome/lib/* /usr/lib/hadoop/lib
-    cp -r $installHome/lib/* /usr/lib/hadoop-hdfs/lib
-    cp -r $installHome/lib/ranger-hive-plugin-impl/usr/lib/hadoop/lib
-    cp -r $installHome/lib/ranger-hive-plugin-impl/usr/lib/hadoop-hdfs/lib
+    cp $installHome/lib/* /usr/lib/hive/lib
+    cp -r $installHome/lib/ranger-hive-plugin-impl /usr/lib/hive/lib
 
     bash $installHome/enable-hive-plugin.sh
     restartHiveServer2
