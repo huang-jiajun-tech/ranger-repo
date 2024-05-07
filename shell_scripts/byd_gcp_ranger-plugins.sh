@@ -65,9 +65,10 @@ function installRangerOpenSourceHdfsPlugin() {
     #printHeading "INSTALL RANGER HDFS PLUGIN ON MASTER NODE"
     cp $installHome/lib/* /usr/lib/hadoop/lib
     cp $installHome/lib/* /usr/lib/hadoop-hdfs/lib
-    cp /usr/lib/hadoop/lib/ranger-hdfs-plugin-impl/commons-lang-2.6.jar /usr/lib/hadoop/lib/
     cp -r $installHome/lib/ranger-hdfs-plugin-impl /usr/lib/hadoop/lib
     cp -r $installHome/lib/ranger-hdfs-plugin-impl /usr/lib/hadoop-hdfs/lib
+    cp /usr/lib/hadoop/lib/ranger-hdfs-plugin-impl/commons-lang-2.6.jar /usr/lib/hadoop/lib/
+
 
     bash $installHome/enable-hdfs-plugin.sh
     restartNamenode
@@ -128,7 +129,7 @@ function installRangerOpenSourceYARNPlugin() {
     
     # the enable-hbase-plugin.sh just work with open source version of hadoop,
     # for emr, we have to copy ranger jars to /usr/lib/hbase/lib/
-    cp $installHome/lib/* /usr/lib/hadoop/lib
+    cp -r $installHome/lib/* /usr/lib/hadoop/lib
     cp -r $installHome/lib/ranger-yarn-plugin-impl /usr/lib/hadoop/lib
 
     bash $installHome/enable-yarn-plugin.sh
@@ -172,7 +173,7 @@ function main(){
     d_hostname="$(hostname)"
     if [[ "${d_hostname}" == "${CLUSTER_ID}-m-0" ]]; then
         wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-hdfs-repo.json
-        wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-hive-policy.json
+        wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-hdfs-policy.json
         wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-hive-repo.json
 
         #新增yarn
