@@ -43,13 +43,14 @@
 export CLUSTER_ID=$(/usr/share/google/get_metadata_value attributes/cluster-id)
 export SOLR_HOST=$(/usr/share/google/get_metadata_value attributes/solr-host)
 export RANGER_HOST=$(/usr/share/google/get_metadata_value attributes/ranger-host)
+export DATA_BUCKET=$(/usr/share/google/get_metadata_value attributes/data-bucket)
 
 
 # -------------------------------------   Open Source HDFS PlugIn Operations   --------------------------------------- #
 
 function installRangerOpenSourceHdfsPlugin() {
     #printHeading "INSTALL RANGER HDFS PLUGIN"
-    wget -P /opt https://raw.githubusercontent.com/huang-jiajun-tech/ranger-repo/main/ranger-2.2.0-hdfs-plugin.tar.gz
+    wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/plugin/ranger-2.2.0-hdfs-plugin.tar.gz
     tar -zxvf /opt/ranger-2.2.0-hdfs-plugin.tar.gz -C /opt &>/dev/null
     installFilesDir=/opt/ranger-2.2.0-hdfs-plugin
     confFile=$installFilesDir/install.properties
@@ -81,7 +82,7 @@ function restartNamenode() {
 
 function installRangerOpenSourceHivePlugin() {
     #printHeading "INSTALL RANGER HIVE PLUGIN"
-    wget -P /opt https://raw.githubusercontent.com/huang-jiajun-tech/ranger-repo/main/ranger-2.2.0-hive-plugin.tar.gz    
+    wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/plugin/ranger-2.2.0-hive-plugin.tar.gz    
     tar -zxvf /opt/ranger-2.2.0-hive-plugin.tar.gz -C /opt/ &>/dev/null
     installFilesDir=/opt/ranger-2.2.0-hive-plugin
     confFile=$installFilesDir/install.properties
@@ -123,6 +124,26 @@ function retry_command() {
 function main(){
 	local role
 	role="$(/usr/share/google/get_metadata_value attributes/dataproc-role)"
+    # 只在第一台Master节点上安装
+    d_hostname="$(hostname)"
+    if [[ "${d_hostname}" == "${CLUSTER_ID}-m-0" ]]; then
+        wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-hdfs-repo.json
+        wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-hive-policy.json
+        wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-hive-repo.json
+
+        sed -i "s/@CLUSTER_ID@/${CLUSTER_ID}/g" /opt/open-source-hdfs-repo.json
+        sed -i "s/@HDFS_URL@/${CLUSTER_ID}/g" /opt/open-source-hdfs-repo.json
+        sed -i "s/@CLUSTER_ID@/${CLUSTER_ID}/g" /opt/open-source-hdfs-policy.json
+        sed -i "s/@CLUSTER_ID@/${CLUSTER_ID}/g" /opt/open-source-hive-repo.json
+        sed -i "s/@FIRST_MASTER_NODE@/${d_hostname}/g" /opt/open-source-hive-repo.json
+
+        curl -iv -u admin:admin -d @/opt/open-source-hdfs-repo.json -H "Content-Type: application/json" \
+                -X POST http://${RANGER_HOST}:6080/service/public/api/repository/
+        curl -iv -u admin:admin -d @/opt/open-source-hdfs-policy.json -H "Content-Type: application/json" \
+                -X POST http://${RANGER_HOST}:6080/service/public/api/policy/
+        curl -iv -u admin:admin -d @/opt/open-source-hive-repo.json -H "Content-Type: application/json" \
+                -X POST http://${RANGER_HOST}:6080/service/public/api/repository/
+    fi
 	
 	# 只在Master节点上安装
 	if [[ "${role}" == 'Master' ]]; then

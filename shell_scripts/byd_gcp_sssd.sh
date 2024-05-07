@@ -1,4 +1,5 @@
 #!/bin/bash
+#!/usr/bin/env bash
 
 # 设置环境变量
 export OPENLDAP_HOST=$(/usr/share/google/get_metadata_value attributes/openldap-host)
@@ -38,7 +39,7 @@ ldap_search_base = ${OPENLDAP_BASE_DN}
 ldap_default_bind_dn = ${SSSD_BIND_DN}
 ldap_default_authtok_type = password
 ldap_default_authtok = ${SSSD_BIND_PASSWORD}
-override_home=/home/%u
+override_homedir=/home/%u
 default_shell=/bin/bash
 [nss]
 homedir_substring = /home

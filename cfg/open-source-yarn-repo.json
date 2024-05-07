@@ -1,0 +1,13 @@
+{
+  "name": "YARN_@CLUSTER_ID@",
+  "description": "Yarn Repo",
+  "type": "Yarn",
+  "isEnabled": true,
+  "configs": {
+   "username": "yarn",
+   "password": "yarn",
+   "yarn.url": "http://@CLUSTER_ID@-m-0:8088;http://@CLUSTER_ID@-m-1:8088;http://@CLUSTER_ID@-m-2:8088",
+   "hadoop.security.authentication": "simple",
+   "commonNameForCertificate": ""
+ }
+}
