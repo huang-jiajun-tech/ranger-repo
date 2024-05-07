@@ -65,6 +65,7 @@ function installRangerOpenSourceHdfsPlugin() {
     #printHeading "INSTALL RANGER HDFS PLUGIN ON MASTER NODE"
     cp $installHome/lib/* /usr/lib/hadoop/lib
     cp $installHome/lib/* /usr/lib/hadoop-hdfs/lib
+    cp /usr/lib/hadoop/lib/ranger-hdfs-plugin-impl/commons-lang-2.6.jar /usr/lib/hadoop/lib/
     cp -r $installHome/lib/ranger-hdfs-plugin-impl /usr/lib/hadoop/lib
     cp -r $installHome/lib/ranger-hdfs-plugin-impl /usr/lib/hadoop-hdfs/lib
 
@@ -103,8 +104,51 @@ function installRangerOpenSourceHivePlugin() {
 
 function restartHiveServer2() {
     #printHeading "RESTART HIVESERVER2"
+    systemctl daemon-reload
     systemctl stop hive-server2
     systemctl start hive-server2
+}
+
+
+# -------------------------------------   Open Source Hive PlugIn Operations   --------------------------------------- #
+function installRangerOpenSourceYARNPlugin() {
+    printHeading "INSTALL RANGER YARN PLUGIN"
+    wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/plugin/ranger-2.2.0-yarn-plugin.tar.gz    
+    tar -zxvf /opt/ranger-2.2.0-yarn-plugin.tar.gz -C /opt/ &>/dev/null
+    installFilesDir=/opt/ranger-2.2.0-yarn-plugin
+    confFile=$installFilesDir/install.properties
+    # backup install.properties
+    cp $confFile $confFile.$(date +%s)
+    sed -i "s|@CLUSTER_ID@|${CLUSTER_ID}|g" $confFile
+    sed -i "s|@SOLR_HOST@|${SOLR_HOST}|g" $confFile
+    sed -i "s|@RANGER_HOST@|${RANGER_HOST}|g" $confFile
+        
+    printHeading "INSTALL RANGER HBASE PLUGIN ON MASTER: [ $(hostname) ]: "
+    installHome=/opt/ranger-2.2.0-yarn-plugin
+    
+    # the enable-hbase-plugin.sh just work with open source version of hadoop,
+    # for emr, we have to copy ranger jars to /usr/lib/hbase/lib/
+    cp $installHome/lib/* /usr/lib/hadoop/lib
+    cp -r $installHome/lib/ranger-yarn-plugin-impl /usr/lib/hadoop/lib
+
+    bash $installHome/enable-yarn-plugin.sh
+    chown yarn:hadoop /etc/ranger/YARN_${CLUSTER_ID}/.cred.jceks.crc
+
+    systemctl restart hadoop-yarn-resourcemanager
+}
+
+
+
+function printHeading(){
+    title="$1"
+    if [ "$TERM" = "dumb" -o "$TERM" = "unknown" ]; then
+        paddingWidth=60
+    else
+        paddingWidth=$((($(tput cols)-${#title})/2-5))
+    fi
+    printf "\n%${paddingWidth}s"|tr ' ' '='
+    printf "    $title    "
+    printf "%${paddingWidth}s\n\n"|tr ' ' '='
 }
 
 ##retry command
@@ -131,11 +175,17 @@ function main(){
         wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-hive-policy.json
         wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-hive-repo.json
 
+        #新增yarn
+        wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-yarn-repo.json
+
         sed -i "s/@CLUSTER_ID@/${CLUSTER_ID}/g" /opt/open-source-hdfs-repo.json
         sed -i "s/@HDFS_URL@/${CLUSTER_ID}/g" /opt/open-source-hdfs-repo.json
         sed -i "s/@CLUSTER_ID@/${CLUSTER_ID}/g" /opt/open-source-hdfs-policy.json
         sed -i "s/@CLUSTER_ID@/${CLUSTER_ID}/g" /opt/open-source-hive-repo.json
         sed -i "s/@FIRST_MASTER_NODE@/${d_hostname}/g" /opt/open-source-hive-repo.json
+
+        #新增yarn
+        sed -i "s|@CLUSTER_ID@|${CLUSTER_ID}|g" /opt/open-source-yarn-repo.json
 
         curl -iv -u admin:admin -d @/opt/open-source-hdfs-repo.json -H "Content-Type: application/json" \
                 -X POST http://${RANGER_HOST}:6080/service/public/api/repository/
@@ -143,12 +193,15 @@ function main(){
                 -X POST http://${RANGER_HOST}:6080/service/public/api/policy/
         curl -iv -u admin:admin -d @/opt/open-source-hive-repo.json -H "Content-Type: application/json" \
                 -X POST http://${RANGER_HOST}:6080/service/public/api/repository/
+        curl -iv -u admin:admin -d @/opt/open-source-yarn-repo.json -H "Content-Type: application/json" \
+                -X POST http://${RANGER_HOST}:6080/service/public/v2/api/service
     fi
 	
 	# 只在Master节点上安装
 	if [[ "${role}" == 'Master' ]]; then
 		installRangerOpenSourceHdfsPlugin
 		installRangerOpenSourceHivePlugin
+        installRangerOpenSourceYARNPlugin
 	fi
 }
 
