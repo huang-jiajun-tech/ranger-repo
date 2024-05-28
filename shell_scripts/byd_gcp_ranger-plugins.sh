@@ -63,8 +63,8 @@ function installRangerOpenSourceHdfsPlugin() {
     installHome=/opt/ranger-2.2.0-hdfs-plugin
 
     #printHeading "INSTALL RANGER HDFS PLUGIN ON MASTER NODE"
-    cp $installHome/lib/* /usr/lib/hadoop/lib
-    cp $installHome/lib/* /usr/lib/hadoop-hdfs/lib
+    cp $installHome/lib/*.jar /usr/lib/hadoop/lib
+    cp $installHome/lib/*.jar /usr/lib/hadoop-hdfs/lib
     cp -r $installHome/lib/ranger-hdfs-plugin-impl /usr/lib/hadoop/lib
     cp -r $installHome/lib/ranger-hdfs-plugin-impl /usr/lib/hadoop-hdfs/lib
     cp /usr/lib/hadoop/lib/ranger-hdfs-plugin-impl/commons-lang-2.6.jar /usr/lib/hadoop/lib/
@@ -96,10 +96,27 @@ function installRangerOpenSourceHivePlugin() {
     installHome=/opt/ranger-2.2.0-hive-plugin
 
     #printHeading "INSTALL RANGER HIVE PLUGIN ON MASTER NODE"
-    cp $installHome/lib/* /usr/lib/hive/lib
+    cp $installHome/lib/*.jar /usr/lib/hive/lib
     cp -r $installHome/lib/ranger-hive-plugin-impl /usr/lib/hive/lib
 
     bash $installHome/enable-hive-plugin.sh
+
+    unlink /usr/lib/hive/lib/ranger-hive-plugin-impl
+    cp $installHome/lib/ranger-hive-plugin-impl/*.jar /usr/lib/hive/lib
+
+    sed -i "$i\
+  <property>\
+    <name>hive.metastore.pre.event.listeners</name>\
+    <value>org.apache.ranger.authorization.hive.authorizer.RangerHiveMetastoreAuthorizer</value>\
+  </property>\
+  <property>\
+    <name>hive.metastore.event.listeners</name>\
+    <value>org.apache.ranger.authorization.hive.authorizer.RangerHiveMetastorePrivilegeHandler</value>\
+  </property>\
+  <property>\
+    <name>hive.conf.restricted.list</name>\
+    <value>hive.security.authorization.enabled,hive.security.authorization.manager,hive.security.authenticator.manager</value>" /etc/hive/conf/hive-site.xml
+    
     restartHiveServer2
 }
 
@@ -129,7 +146,7 @@ function installRangerOpenSourceYARNPlugin() {
     
     # the enable-hbase-plugin.sh just work with open source version of hadoop,
     # for emr, we have to copy ranger jars to /usr/lib/hbase/lib/
-    cp -r $installHome/lib/* /usr/lib/hadoop/lib
+    cp -r $installHome/lib/*.jar /usr/lib/hadoop/lib
     cp -r $installHome/lib/ranger-yarn-plugin-impl /usr/lib/hadoop/lib
 
     bash $installHome/enable-yarn-plugin.sh
@@ -166,36 +183,49 @@ function retry_command() {
   return 1
 }
 
+function repo_create(){
+    wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-hdfs-repo.json
+    wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-hdfs-policy.json
+    wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-hive-repo.json
+
+    #新增yarn
+    wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-yarn-repo.json
+
+    sed -i "s/@CLUSTER_ID@/${CLUSTER_ID}/g" /opt/open-source-hdfs-repo.json
+    sed -i "s/@HDFS_URL@/${CLUSTER_ID}/g" /opt/open-source-hdfs-repo.json
+    sed -i "s/@CLUSTER_ID@/${CLUSTER_ID}/g" /opt/open-source-hdfs-policy.json
+    sed -i "s/@CLUSTER_ID@/${CLUSTER_ID}/g" /opt/open-source-hive-repo.json
+    sed -i "s/@FIRST_MASTER_NODE@/${d_hostname}/g" /opt/open-source-hive-repo.json
+
+    #新增yarn
+    sed -i "s|@CLUSTER_ID@|${CLUSTER_ID}|g" /opt/open-source-yarn-repo.json
+
+    curl -iv -u admin:admin -d @/opt/open-source-hdfs-repo.json -H "Content-Type: application/json" \
+        -X POST http://${RANGER_HOST}:6080/service/public/api/repository/
+    curl -iv -u admin:admin -d @/opt/open-source-hdfs-policy.json -H "Content-Type: application/json" \
+        -X POST http://${RANGER_HOST}:6080/service/public/api/policy/
+    curl -iv -u admin:admin -d @/opt/open-source-hive-repo.json -H "Content-Type: application/json" \
+        -X POST http://${RANGER_HOST}:6080/service/public/api/repository/
+    curl -iv -u admin:admin -d @/opt/open-source-yarn-repo.json -H "Content-Type: application/json" \
+        -X POST http://${RANGER_HOST}:6080/service/public/v2/api/service
+
+    printHeading "The ranger repository is created."
+}
+
+
+function trino_config(){
+    
+}
+
+
 function main(){
 	local role
 	role="$(/usr/share/google/get_metadata_value attributes/dataproc-role)"
+    
     # 只在第一台Master节点上安装
     d_hostname="$(hostname)"
     if [[ "${d_hostname}" == "${CLUSTER_ID}-m-0" ]]; then
-        wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-hdfs-repo.json
-        wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-hdfs-policy.json
-        wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-hive-repo.json
-
-        #新增yarn
-        wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-yarn-repo.json
-
-        sed -i "s/@CLUSTER_ID@/${CLUSTER_ID}/g" /opt/open-source-hdfs-repo.json
-        sed -i "s/@HDFS_URL@/${CLUSTER_ID}/g" /opt/open-source-hdfs-repo.json
-        sed -i "s/@CLUSTER_ID@/${CLUSTER_ID}/g" /opt/open-source-hdfs-policy.json
-        sed -i "s/@CLUSTER_ID@/${CLUSTER_ID}/g" /opt/open-source-hive-repo.json
-        sed -i "s/@FIRST_MASTER_NODE@/${d_hostname}/g" /opt/open-source-hive-repo.json
-
-        #新增yarn
-        sed -i "s|@CLUSTER_ID@|${CLUSTER_ID}|g" /opt/open-source-yarn-repo.json
-
-        curl -iv -u admin:admin -d @/opt/open-source-hdfs-repo.json -H "Content-Type: application/json" \
-                -X POST http://${RANGER_HOST}:6080/service/public/api/repository/
-        curl -iv -u admin:admin -d @/opt/open-source-hdfs-policy.json -H "Content-Type: application/json" \
-                -X POST http://${RANGER_HOST}:6080/service/public/api/policy/
-        curl -iv -u admin:admin -d @/opt/open-source-hive-repo.json -H "Content-Type: application/json" \
-                -X POST http://${RANGER_HOST}:6080/service/public/api/repository/
-        curl -iv -u admin:admin -d @/opt/open-source-yarn-repo.json -H "Content-Type: application/json" \
-                -X POST http://${RANGER_HOST}:6080/service/public/v2/api/service
+        repo_create
     fi
 	
 	# 只在Master节点上安装
