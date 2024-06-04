@@ -50,7 +50,7 @@ export DATA_BUCKET=$(/usr/share/google/get_metadata_value attributes/data-bucket
 
 function installRangerOpenSourceHdfsPlugin() {
     #printHeading "INSTALL RANGER HDFS PLUGIN"
-    wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/plugin/ranger-2.2.0-hdfs-plugin.tar.gz
+    gcloud storage cp gs://${DATA_BUCKET}/plugin/ranger-2.2.0-hdfs-plugin.tar.gz /opt/
     tar -zxvf /opt/ranger-2.2.0-hdfs-plugin.tar.gz -C /opt &>/dev/null
     installFilesDir=/opt/ranger-2.2.0-hdfs-plugin
     confFile=$installFilesDir/install.properties
@@ -84,8 +84,8 @@ function restartNamenode() {
 
 function installRangerOpenSourceHivePlugin() {
     #printHeading "INSTALL RANGER HIVE PLUGIN"
-    wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/plugin/ranger-2.2.0-hive-plugin.tar.gz    
-    tar -zxvf /opt/ranger-2.2.0-hive-plugin.tar.gz -C /opt/ &>/dev/null
+    gcloud storage cp gs://${DATA_BUCKET}/plugin/ranger-2.2.0-hive-metastore-plugin.tar.gz /opt/
+    tar -zxvf /opt/ranger-2.2.0-hive-metastore-plugin.tar.gz -C /opt/ &>/dev/null
     installFilesDir=/opt/ranger-2.2.0-hive-plugin
     confFile=$installFilesDir/install.properties
     # backup install.properties
@@ -131,7 +131,7 @@ function restartHiveServer2() {
 # -------------------------------------   Open Source Hive PlugIn Operations   --------------------------------------- #
 function installRangerOpenSourceYARNPlugin() {
     printHeading "INSTALL RANGER YARN PLUGIN"
-    wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/plugin/ranger-2.2.0-yarn-plugin.tar.gz    
+    gcloud storage cp gs://${DATA_BUCKET}/plugin/ranger-2.2.0-yarn-plugin.tar.gz /opt/
     tar -zxvf /opt/ranger-2.2.0-yarn-plugin.tar.gz -C /opt/ &>/dev/null
     installFilesDir=/opt/ranger-2.2.0-yarn-plugin
     confFile=$installFilesDir/install.properties
@@ -184,12 +184,12 @@ function retry_command() {
 }
 
 function repo_create(){
-    wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-hdfs-repo.json
-    wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-hdfs-policy.json
-    wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-hive-repo.json
+    gcloud storage cp gs://${DATA_BUCKET}/cfg/open-source-hdfs-repo.json /opt/
+    gcloud storage cp gs://${DATA_BUCKET}/cfg/open-source-hdfs-policy.json /opt/
+    gcloud storage cp gs://${DATA_BUCKET}/cfg/open-source-hive-repo.json /opt/
 
     #新增yarn
-    wget -P /opt https://storage.googleapis.com/${DATA_BUCKET}/cfg/open-source-yarn-repo.json
+    gcloud storage cp gs://${DATA_BUCKET}/cfg/open-source-yarn-repo.json
 
     sed -i "s/@CLUSTER_ID@/${CLUSTER_ID}/g" /opt/open-source-hdfs-repo.json
     sed -i "s/@HDFS_URL@/${CLUSTER_ID}/g" /opt/open-source-hdfs-repo.json
@@ -213,7 +213,87 @@ function repo_create(){
 }
 
 
-function trino_config(){
+function cacreate(){
+    mkdir -p /mnt/demoCA && cd /mnt/demoCA
+
+    #获取ip地址
+    #commonName和IP必须和主机的hostname与IP相同。
+    #local_ipv4=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
+    local_ipv4=$(hostname -I | awk '{print $1}')
+    local_hostname=$(hostname)
+    local_hostname_long=$(hostname -f)
+
+    cat << EOF > openssl.cnf
+[req]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+
+
+[req_distinguished_name]
+countryName                     = Country Name (2 letter code)
+countryName_default             = US
+stateOrProvinceName             = State or Province Name (full name)
+stateOrProvinceName_default     = California
+localityName                    = Locality Name (eg, city)
+localityName_default            = San Francisco
+organizationName                = Organization Name (eg, company)
+organizationName_default        = My Company
+organizationalUnitName          = Organizational Unit Name (eg, section)
+organizationalUnitName_default  = IT Department
+commonName                      = ${local_hostname}
+commonName_max                  = 64
+
+
+[v3_req]
+basicConstraints = CA:TRUE
+subjectAltName = @alt_names
+
+[alt_names]
+IP.1 = ${local_ipv4}
+DNS.1 = ${local_hostname}
+DNS.2 = ${local_hostname_long}
+EOF
+
+    #创建 CA 目录结构
+    mkdir -p /mnt/demoCA/private
+    mkdir -p /mnt/demoCA/newcerts
+    touch /mnt/demoCA/index.txt
+    echo 01 > /mnt/demoCA/serial
+    # 生成 CA 的 RSA 密钥对
+    PASSWORD="1234"
+    openssl genrsa -des3 -out /mnt/demoCA/private/cakey.pem -passout pass:"$PASSWORD" 2048
+
+    # 自签发 CA 证书
+    PASSWORD="1234"
+    local_hostname=$(hostname)
+    SUBJECT="/C=US/ST=California/L=San Francisco/O=My Company/OU=IT Department/CN=${local_hostname}"
+    openssl req -new -x509 -days 365 -key /mnt/demoCA/private/cakey.pem -passin pass:"$PASSWORD" -out /mnt/demoCA/cacert.pem -extensions v3_req -config /mnt/demoCA/openssl.cnf -subj "$SUBJECT"
+    # 查看证书内容
+    openssl x509 -in /mnt/demoCA/cacert.pem -noout -text
+    # 设置输入密码（cakey.pem的密码）
+    IN_PASSWORD="1234"
+    # 设置输出密码（生成的P12文件的密码）
+    OUT_PASSWORD="1234"
+    # 生成PKCS12文件
+    openssl pkcs12 -inkey /mnt/demoCA/private/cakey.pem -in /mnt/demoCA/cacert.pem -export -out /mnt/demoCA/certificate.p12 -passin pass:"$IN_PASSWORD" -passout pass:"$OUT_PASSWORD"
+
+    # 默认密码通常为"changeit"
+    KEYSTORE_PASSWORD="changeit"
+    ALIAS="mytrinoserver2"
+    CERT_FILE="/mnt/demoCA/cacert.pem"
+    #KEYSTORE_PATH="/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.372.b07-1.amzn2.0.1.x86_64/jre/lib/security/cacerts"
+    KEYSTORE_PATH="/usr/lib/jvm/temurin-11-jdk-amd64/lib/security/cacerts"
+    # 导入证书到密钥库
+    sudo keytool -import -alias "$ALIAS" -file "$CERT_FILE" -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -noprompt
+}
+
+
+function trino_config_master(){
+    cacreate
+
+}
+
+function trino_config_worker(){
     
 }
 
@@ -233,6 +313,7 @@ function main(){
 		installRangerOpenSourceHdfsPlugin
 		installRangerOpenSourceHivePlugin
         installRangerOpenSourceYARNPlugin
+        trino_config
 	fi
 }
 
