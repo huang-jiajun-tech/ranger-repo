@@ -44,7 +44,7 @@ export CLUSTER_ID=$(/usr/share/google/get_metadata_value attributes/cluster-id)
 export SOLR_HOST=$(/usr/share/google/get_metadata_value attributes/solr-host)
 export RANGER_HOST=$(/usr/share/google/get_metadata_value attributes/ranger-host)
 export DATA_BUCKET=$(/usr/share/google/get_metadata_value attributes/data-bucket)
-export TRINO_SRCERT=""
+export TRINO_SRCERT="xxufENF0K5e7SgHSC75YazGKmn7RznwLrIUDDRZ9fH78julokc3DcUvBqzvFDb8j1miWnrrVxn3bEev493y2YpwjYtm0wpo9/tpU7UGCND3DClxNJOvb0SIf1F6aiVgvhHmg5NKilv+ygeek1R6xlPGPc2fAiIxVFVQx39KtKwdg0JD2WPC7LvU/A9u3+hTh2fg43P6AIWOXgvGJdybLDv1kyKdkm2PTy+UtAilqUjeCfwWRDJ1Nt484nP8p2bWDzJnnY8sB/NApx99NWsaZuP3dCkPjB4E69pxzLxzyHsBFuTrKKizw51BiX4EYDpCgNVVo9S9XLobsrzIW13hj9Z6LCKVmBfJPGSOr5zBYN6z2AzdACFooGUEuz+lEx9bcAkKl75Q0bR83dw0EWQxS6G9p7gLQVKIM+q3baXS20ksl97pcO5VbVVJyJJNTszTY2qBYWP0OVtU3MXxBQ7MEqm7Zv7W92warwLtB1VLwkVdn46ilQKIEsSOimgQRXZz5NkoQzSPxKdFAiJoEfXLaBufD7fgeYc4UNuruGOlKz0Bm/Rj9mYFQe7XRgaFnzYvvJgOHRdQoYIKsG0583/V5wOyBClbGXdgZq81HsXfVJ9R3ZurfZbIurVxy7dssc0NZaGIA5LWrx4N5zPDxU2BJbSFlDLUxXobW6yCXO0Np7so="
 
 # -------------------------------------   Open Source HDFS PlugIn Operations   --------------------------------------- #
 
@@ -103,6 +103,9 @@ function installRangerOpenSourceHivePlugin() {
 
     unlink /usr/lib/hive/lib/ranger-hive-plugin-impl
     cp $installHome/lib/ranger-hive-plugin-impl/*.jar /usr/lib/hive/lib
+
+    cp /usr/lib/hive/lib/ranger*.jar /usr/lib/spark/jars
+    cp /usr/lib/hive/lib/hive-exec-3.1.3.jar /usr/lib/spark/jars
 
     sed -i "$i\
   <property>\
@@ -267,7 +270,7 @@ EOF
     PASSWORD="1234"
     local_hostname=$(hostname)
     SUBJECT="/C=US/ST=California/L=San Francisco/O=My Company/OU=IT Department/CN=${local_hostname}"
-    openssl req -new -x509 -days 365 -key /mnt/demoCA/private/cakey.pem -passin pass:"$PASSWORD" -out /mnt/demoCA/cacert.pem -extensions v3_req -config /mnt/demoCA/openssl.cnf -subj "$SUBJECT"
+    openssl req -new -x509 -days 1825 -key /mnt/demoCA/private/cakey.pem -passin pass:"$PASSWORD" -out /mnt/demoCA/cacert.pem -extensions v3_req -config /mnt/demoCA/openssl.cnf -subj "$SUBJECT"
     # 查看证书内容
     openssl x509 -in /mnt/demoCA/cacert.pem -noout -text
     # 设置输入密码（cakey.pem的密码）
@@ -332,8 +335,11 @@ function main(){
 		installRangerOpenSourceHdfsPlugin
 		installRangerOpenSourceHivePlugin
         installRangerOpenSourceYARNPlugin
-        trino_config
+        trino_config_master
 	fi
+    if [[ "${role}" == 'Worker' ]]; then
+        trino_config_worker
+    fi
 }
 
 main
