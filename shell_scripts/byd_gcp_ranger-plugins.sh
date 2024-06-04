@@ -44,7 +44,7 @@ export CLUSTER_ID=$(/usr/share/google/get_metadata_value attributes/cluster-id)
 export SOLR_HOST=$(/usr/share/google/get_metadata_value attributes/solr-host)
 export RANGER_HOST=$(/usr/share/google/get_metadata_value attributes/ranger-host)
 export DATA_BUCKET=$(/usr/share/google/get_metadata_value attributes/data-bucket)
-
+export TRINO_SRCERT=""
 
 # -------------------------------------   Open Source HDFS PlugIn Operations   --------------------------------------- #
 
@@ -290,11 +290,30 @@ EOF
 
 function trino_config_master(){
     cacreate
-
+    cat << EOF >> /etc/trino/conf/config.properties
+http-server.authentication.type = PASSWORD
+http-server.https.enabled = true
+http-server.https.keystore.path = /mnt/demoCA/certificate.p12
+http-server.https.port = 8446
+internal-communication.shared-secret = ${TRINO_SRCERT}
+http-server.https.keystore.key = 1234
+EOF
+    cat << EOF > /etc/trino/conf/password-authenticator.properties
+password-authenticator.name=ldap
+ldap.url=ldap://${RANGER_HOST}:389
+ldap.user-bind-pattern=uid=$\{USER\},ou=users,dc=test,dc=com
+ldap.allow-insecure=true
+EOF
+    printHeading "Restart the Trino Service."
+    systemctl restart trino
 }
 
 function trino_config_worker(){
-    
+    cat << EOF >> /etc/trino/conf/config.properties
+internal-communication.shared-secret = ${TRINO_SRCERT}
+EOF
+    printHeading "Restart the Trino Service."
+    systemctl restart trino
 }
 
 
