@@ -325,13 +325,14 @@ function main(){
 	role="$(/usr/share/google/get_metadata_value attributes/dataproc-role)"
     
     # 只在第一台Master节点上安装
-    d_hostname="$(hostname)"
-    if [[ "${d_hostname}" == "${CLUSTER_ID}-m-0" ]]; then
-        repo_create
-    fi
+    # d_hostname="$(hostname)"
+    # if [[ "${d_hostname}" == "${CLUSTER_ID}-m-0" ]]; then
+    #     repo_create
+    # fi
 	
 	# 只在Master节点上安装
 	if [[ "${role}" == 'Master' ]]; then
+        repo_create
 		installRangerOpenSourceHdfsPlugin
 		installRangerOpenSourceHivePlugin
         installRangerOpenSourceYARNPlugin
