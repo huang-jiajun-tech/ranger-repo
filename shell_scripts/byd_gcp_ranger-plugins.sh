@@ -192,7 +192,7 @@ function repo_create(){
     gcloud storage cp gs://${DATA_BUCKET}/cfg/open-source-hive-repo.json /opt/
 
     #新增yarn
-    gcloud storage cp gs://${DATA_BUCKET}/cfg/open-source-yarn-repo.json
+    gcloud storage cp gs://${DATA_BUCKET}/cfg/open-source-yarn-repo.json /opt/
 
     sed -i "s/@CLUSTER_ID@/${CLUSTER_ID}/g" /opt/open-source-hdfs-repo.json
     sed -i "s/@HDFS_URL@/${CLUSTER_ID}/g" /opt/open-source-hdfs-repo.json
