@@ -1,0 +1,229 @@
+
+
+#########################################
+##环境检查
+#########################################
+
+#检查subnet的连通性
+#检查vm service account的权限 
+
+roles/cloudkms.cryptoKeyDecrypter
+roles/cloudkms.cryptoKeyEncrypter
+Secret Manager Admin
+Storage Admin
+
+
+
+#########################################
+##环境变量 env
+#########################################
+export REGION="southamerica-east1"
+export ZONE="southamerica-east1-b"
+export SUBNET="projects/baidao-bigdata-for-byd/regions/southamerica-east1/subnetworks/default"
+export PROJECT="baidao-bigdata-for-byd"
+export WAREHOUSE_BUCKET="br-ghy-bigdata-hive-prod-bd-2"
+
+##新增openldap和ranger plugin所需的环境变量
+export OPENLDAP_HOST="10.128.0.2"
+export SSSD_BIND_PASS="123456"
+export CLUSTER_ID="br-ghy-bigdata-hive-prod-new-1"
+export RANGER_HOST="10.158.0.37"
+export SLOR_HOST="10.158.0.37"
+
+export MYSQL_INSTANCE="baidao-hive-metastore"
+export ROOT_PASS="Baidao123.."
+
+
+
+
+#########################################
+##  1、创建数据库
+#########################################
+
+gcloud sql instances create ${MYSQL_INSTANCE} --database-version=MYSQL_8_0_33 --availability-type=regional --enable-bin-log \
+    --no-assign-ip --root-password=${ROOT_PASS} --cpu=4 --memory=16GB --region=${REGION} --edition=enterprise \
+    --database-flags lower_case_table_names=1,log_bin_trust_function_creators=on,log_output=FILE,slow_query_log=on,long_query_time=1 \
+    --storage-size 500GB --storage-type=SSD --insights-config-query-insights-enabled \
+    --network=projects/baidao-bigdata-for-byd/global/networks/default \
+    --deletion-protect 
+
+
+
+
+#########################################
+##  2、创建dataproc桶
+#########################################
+
+gsutil mb -l ${REGION} -b on gs://${WAREHOUSE_BUCKET}
+
+#copy初始化文件
+gsutil ls -r gs://fr-ghy-bigdata-hive-prod
+gs://fr-ghy-bigdata-hive-prod/cfg/:
+gs://fr-ghy-bigdata-hive-prod/cfg/open-source-hdfs-policy.json
+gs://fr-ghy-bigdata-hive-prod/cfg/open-source-hdfs-repo.json
+gs://fr-ghy-bigdata-hive-prod/cfg/open-source-hive-repo.json
+gs://fr-ghy-bigdata-hive-prod/cfg/open-source-yarn-repo.json
+
+gs://fr-ghy-bigdata-hive-prod/hive-metastore-pwd/:
+gs://fr-ghy-bigdata-hive-prod/hive-metastore-pwd/admin-password.encrypted
+
+gs://fr-ghy-bigdata-hive-prod/install/:
+gs://fr-ghy-bigdata-hive-prod/install/byd_gcp_kyuubi.sh
+gs://fr-ghy-bigdata-hive-prod/install/byd_gcp_ranger-plugins.sh
+gs://fr-ghy-bigdata-hive-prod/install/byd_gcp_sssd.sh
+gs://fr-ghy-bigdata-hive-prod/install/byd_gcp_trino_ssl.sh
+gs://fr-ghy-bigdata-hive-prod/install/cloud-sql-proxy.sh
+gs://fr-ghy-bigdata-hive-prod/install/oozie_byd.sh
+gs://fr-ghy-bigdata-hive-prod/install/other_steps.sh
+gs://fr-ghy-bigdata-hive-prod/install/sqoop.sh
+
+gs://fr-ghy-bigdata-hive-prod/jars/:
+gs://fr-ghy-bigdata-hive-prod/jars/iceberg-hive-runtime-1.5.2.jar
+gs://fr-ghy-bigdata-hive-prod/jars/iceberg-spark-runtime-3.3_2.12-1.4.3.jar
+gs://fr-ghy-bigdata-hive-prod/jars/org.apache.iceberg_iceberg-spark-runtime-3.3_2.12-1.4.3.jar
+gs://fr-ghy-bigdata-hive-prod/jars/trino-jdbc-376.jar
+
+gs://fr-ghy-bigdata-hive-prod/plugin/:
+gs://fr-ghy-bigdata-hive-prod/plugin/ranger-2.2.0-hdfs-plugin.tar.gz
+gs://fr-ghy-bigdata-hive-prod/plugin/ranger-2.2.0-hive-metastore-plugin.tar.gz
+gs://fr-ghy-bigdata-hive-prod/plugin/ranger-2.2.0-yarn-plugin.tar.gz
+
+
+
+
+#########################################
+##  3、准备hive,oozie数据库的密码
+#########################################
+
+#hive 生成加密key
+
+gcloud kms keyrings create bigdata-hive --location ${REGION}
+gcloud kms keys create hive-metastore \
+    --location ${REGION} \
+    --keyring bigdata-hive \
+    --purpose encryption
+
+
+echo "byd770405" | \
+gcloud kms encrypt \
+    --location=${REGION} \
+    --keyring=bigdata-hive \
+    --key=hive-metastore \
+    --plaintext-file=- \
+    --ciphertext-file=admin-password.encrypted
+
+gcloud storage cp ./admin-password.encrypted  gs://${WAREHOUSE_BUCKET}/hive-metastore-pwd/admin-password.encrypted
+
+#oozie 生成加密secret
+
+echo -n "byd770405" | gcloud secrets create mysql-root-password-secret-name \
+    --replication-policy="automatic" \
+    --data-file=-
+
+echo -n "byd770405" | gcloud secrets create oozie-password-secret-name \
+    --replication-policy="automatic" \
+    --data-file=-
+
+
+#########################################
+##  4、ranger+openldap节点安装
+#########################################
+
+yum install -y git
+cd /tmp && git clone -b dev https://github.com/zzzfung/ranger-cli-installer.git && cd ranger-cli-installer
+
+openldap安装：
+./install_openldap.sh
+./add_user.sh
+
+ranger安装：
+sudo sh ./ranger-admin.sh install-ranger \
+    --mysql-host '10.56.65.3' \
+    --mysql-root-password 'Baidao123..' \
+    --mysql-ranger-db-user-password 'ranger' \
+    --solution 'open-source' \
+    --auth-provider 'openldap' \
+    --openldap-host "127.0.0.1" \
+    --openldap-base-dn 'dc=test,dc=com' \
+    --ranger-bind-dn 'cn=ranger,ou=services,dc=test,dc=com' \
+    --ranger-bind-password 'ranger' \
+    --openldap-user-dn-pattern 'uid={0},ou=users,dc=test,dc=com' \
+    --openldap-group-search-filter '(member=uid={0},ou=users,dc=test,dc=com)' \
+    --openldap-user-object-class 'inetOrgPerson'
+
+
+
+#########################################
+##  5、创建Hive集群，并且初始化安装sssd服务
+#########################################
+
+gcloud dataproc clusters create ${CLUSTER_ID} \
+    --enable-component-gateway \
+    --scopes cloud-platform \
+    --tags all \
+    --region ${REGION} \
+    --zone ${ZONE} \
+    --subnet ${SUBNET} \
+    --num-masters=1 \
+    --master-machine-type n2-standard-8 \
+    --master-boot-disk-type pd-balanced \
+    --master-boot-disk-size 200 \
+    --num-workers 2 \
+    --worker-machine-type n2-standard-8 \
+    --worker-boot-disk-type pd-balanced \
+    --worker-boot-disk-size 200 \
+    --optional-components ZOOKEEPER,trino,flink \
+    --image-version 2.1-debian11 \
+    --project ${PROJECT} \
+    --bucket ${WAREHOUSE_BUCKET} \
+    --temp-bucket ${TEMP_WAREHOUSE_BUCKET} \
+    --initialization-actions gs://${WAREHOUSE_BUCKET}/install/cloud-sql-proxy.sh,gs://${WAREHOUSE_BUCKET}/install/sqoop.sh,gs://${WAREHOUSE_BUCKET}/install/byd_gcp_kyuubi.sh,gs://${WAREHOUSE_BUCKET}/install/oozie_byd.sh,gs://${WAREHOUSE_BUCKET}/install/byd_gcp_sssd.sh,gs://${WAREHOUSE_BUCKET}/install/byd_gcp_trino_ssl.sh,gs://${WAREHOUSE_BUCKET}/install/other_steps.sh \
+    --properties "hive:hive.metastore.warehouse.dir=gs://${WAREHOUSE_BUCKET}/datasets" \
+    --metadata "hive-metastore-instance=${PROJECT}:${REGION}:${MYSQL_INSTANCE}" \
+    --metadata "use-cloud-sql-private-ip=true" \
+    --metadata "kms-key-uri=projects/${PROJECT}/locations/${REGION}/keyRings/bigdata-hive/cryptoKeys/hive-metastore" \
+    --metadata "db-admin-password-uri=gs://${WAREHOUSE_BUCKET}/hive-metastore-pwd/admin-password.encrypted" \
+    --metadata "db-hive-password-uri=gs://${WAREHOUSE_BUCKET}/hive-metastore-pwd/admin-password.encrypted" \
+    --metadata "oozie-password-secret-name=oozie-password-secret-name" \
+    --metadata "mysql-root-password-secret-name=mysql-root-password-secret-name" \
+    --metadata "openldap-host=${OPENLDAP_HOST}" \
+    --metadata "sssd-bind-password=${SSSD_BIND_PASS}" \
+    --metadata "cluster-id=${CLUSTER_ID}" \
+    --metadata "solr-host=${SLOR_HOST}" \
+    --metadata "ranger-host=${RANGER_HOST}" \
+    --metadata "data-bucket=${WAREHOUSE_BUCKET}" \
+    --metadata "block-project-ssh-keys=false" \
+    --properties "core:hadoop.proxyuser.root.hosts=*" \
+    --properties "core:hadoop.proxyuser.root.groups=*" \
+    --properties "core:hadoop.proxyuser.hue.hosts=*" \
+    --properties "core:hadoop.proxyuser.hue.groups=*" \
+    --properties "core:hadoop.proxyuser.hadoop.hosts=*" \
+    --properties "core:hadoop.proxyuser.hadoop.groups=*" \
+    --properties "hdfs:dfs.webhdfs.enable=true" \
+    --properties "yarn:yarn.scheduler.capacity.queue-mappings=u:hadoop:default" \
+    --properties "yarn:yarn.scheduler.capacity.queue-mappings-override.enable=true" \
+    --properties "capacity-scheduler:yarn.scheduler.capacity.root.capacity=100" \
+    --properties "capacity-scheduler:yarn.scheduler.capacity.root.default.capacity=50" \
+    --properties "capacity-scheduler:yarn.scheduler.capacity.root.default.maximum-capacity=65" \
+    --properties "capacity-scheduler:yarn.scheduler.capacity.root.launcher-job.maximum-capacity=25" \
+    --properties "capacity-scheduler:yarn.scheduler.capacity.root.launcher-job.capacity=18" \
+    --properties "capacity-scheduler:yarn.scheduler.capacity.root.product.maximum-capacity=40" \
+    --properties "capacity-scheduler:yarn.scheduler.capacity.root.product.capacity=32" \
+    --properties ^#^capacity-scheduler:yarn.scheduler.capacity.root.queues=default,product,launcher-job \
+    --properties "capacity-scheduler:yarn.scheduler.capacity.resource-calculator=org.apache.hadoop.yarn.util.resource.DominantResourceCalculator" \
+    --properties ^#^hive:tez.mrreader.config.update.properties=hive.io.file.readcolumn.names,hive.io.file.readcolumn.ids \
+    --properties "hive:hive.vectorized.execution.enabled=false" \
+    --properties "hive:iceberg.engine.hive.enabled=true" \
+    --properties "hive:hive.server2.thrift.port=10000" \
+    --properties "spark:spark.sql.legacy.parquet.nanosAsLong=false" \
+    --properties "spark:spark.sql.parquet.enableVectorizedReader=false" \
+    --properties "spark:spark.sql.catalog.spark_catalog=org.apache.iceberg.spark.SparkSessionCatalog" \
+    --properties "spark:spark.driver.extraClassPath=/usr/lib/iceberg/lib/iceberg-spark-runtime-3.3_2.12-1.4.3.jar" \
+    --properties "spark:spark.executor.extraClassPath=/usr/lib/iceberg/lib/iceberg-spark-runtime-3.3_2.12-1.4.3.jar" \
+    --properties ^#^spark:spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
+    --properties ^#^yarn:yarn.resourcemanager.webapp.methods-allowed=GET,HEAD,PUT \
+    --properties "spark:spark.sql.catalog.spark_catalog.type=hive" \
+    --properties "spark:spark.sql.codegen.maxFields=4000" \
+    --properties "trino-catalog:iceberg.connector.name=iceberg,trino-catalog:iceberg.hive.metastore.uri=thrift://${CLUSTER_ID}-m:9083"
+
+
